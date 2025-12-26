@@ -78,6 +78,6 @@ Make sure to configure your environment variables.
 - `npm run seed`: Seeds the database with initial data.
 - `npm test`: Runs backend tests.
 
-## 🤝 Contribution
+## 🔒 Private Project
 
-Contributions are welcome! Please ensure that you update the `.gitignore` as needed and follow the existing code style.
+This is a private project. Contributions are not currently allowed.
