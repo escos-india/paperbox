@@ -19,6 +19,7 @@ const userSchema = new mongoose.Schema({
   },
   email: {
     type: String,
+    required: [true, 'Email is required'],
     trim: true,
     lowercase: true,
     sparse: true,
@@ -26,8 +27,9 @@ const userSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false, // Phone is now optional if email is provided
     unique: true,
+    sparse: true,    // Allows null/undefined values to not conflict
     trim: true,
     match: [/^[6-9]\d{9}$/, 'Please provide a valid 10-digit Indian phone number']
   },

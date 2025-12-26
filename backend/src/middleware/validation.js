@@ -27,6 +27,18 @@ const validators = {
     .matches(/^[6-9]\d{9}$/)
     .withMessage('Please provide a valid 10-digit Indian phone number'),
 
+  // Generic identifier (Phone OR Email)
+  identifier: body('identifier')
+    .trim()
+    .custom((value) => {
+        const emailRegex = /^\S+@\S+\.\S+$/;
+        const phoneRegex = /^[6-9]\d{9}$/;
+        if (emailRegex.test(value) || phoneRegex.test(value)) {
+            return true;
+        }
+        throw new Error('Please provide a valid Phone Number or Email');
+    }),
+
   // OTP validation
   otp: body('otp')
     .trim()

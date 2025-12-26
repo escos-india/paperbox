@@ -10,8 +10,9 @@
         "test": "jest"
     },
     "dependencies": {
+        "axios": "^1.6.2",
         "bcryptjs": "^2.4.3",
-        "cloudinary": "^1.41.0",
+        "cloudinary": "^2.8.0",
         "cors": "^2.8.5",
         "crypto-js": "^4.2.0",
         "dotenv": "^16.3.1",
@@ -20,13 +21,14 @@
         "jsonwebtoken": "^9.0.2",
         "mongoose": "^8.0.3",
         "multer": "^1.4.5-lts.1",
-        "multer-storage-cloudinary": "^4.0.0",
+        "multer-storage-cloudinary": "^2.2.1",
+        "nodemailer": "^7.0.12",
         "razorpay": "^2.9.2",
-        "axios": "^1.6.2"
+        "textfully": "^0.1.9"
     },
     "devDependencies": {
-        "nodemon": "^3.0.2",
-        "jest": "^29.7.0"
+        "jest": "^29.7.0",
+        "nodemon": "^3.0.2"
     },
     "keywords": [
         "marketplace",

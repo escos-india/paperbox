@@ -44,11 +44,8 @@ api.interceptors.response.use(
 
 // ==================== AUTH API ====================
 export const authAPI = {
-    sendOTP: (phone: string) =>
-        api.post('/auth/send-otp', { phone }),
-
-    verifyOTP: (phone: string, otp: string, name?: string) =>
-        api.post('/auth/verify-otp', { phone, otp, name }),
+    sendOTP: (identifier: string) => api.post('/auth/send-otp', { identifier }),
+    verifyOTP: (identifier: string, otp: string, name?: string) => api.post('/auth/verify-otp', { identifier, otp, name }),
 
     vendorSignup: (data: {
         phone: string;

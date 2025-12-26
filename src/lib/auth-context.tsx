@@ -36,8 +36,8 @@ interface AuthContextType {
     isBuyer: boolean
 
     // Auth methods
-    sendOTP: (phone: string) => Promise<{ success: boolean; devOtp?: string; message?: string }>
-    verifyOTP: (phone: string, otp: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean; user?: User; message?: string }>
+    sendOTP: (identifier: string) => Promise<{ success: boolean; devOtp?: string; message?: string }>
+    verifyOTP: (identifier: string, otp: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean; user?: User; message?: string }>
     vendorLogin: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string }>
     adminLoginInit: (email: string, password: string, secretKey: string) => Promise<{ success: boolean; message?: string; phone?: string }>
     adminLoginVerify: (email: string, otp: string) => Promise<{ success: boolean; user?: User; message?: string }>
@@ -104,9 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [])
 
     // Send OTP
-    const sendOTP = useCallback(async (phone: string) => {
+    const sendOTP = useCallback(async (identifier: string) => {
         try {
-            const response = await authAPI.sendOTP(phone)
+            const response = await authAPI.sendOTP(identifier)
             return {
                 success: true,
                 devOtp: response.data.devOtp,
@@ -121,9 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [])
 
     // Verify OTP
-    const verifyOTP = useCallback(async (phone: string, otp: string, name?: string) => {
+    const verifyOTP = useCallback(async (identifier: string, otp: string, name?: string) => {
         try {
-            const response = await authAPI.verifyOTP(phone, otp, name)
+            const response = await authAPI.verifyOTP(identifier, otp, name)
             const { token: newToken, user: newUser, isNewUser } = response.data
 
             setToken(newToken)

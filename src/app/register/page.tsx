@@ -16,16 +16,16 @@ export default function RegisterPage() {
     const router = useRouter()
     const { sendOTP } = useAuth()
 
-    const [step, setStep] = useState<'PHONE' | 'OTP_DETAILS'>('PHONE')
+    const [step, setStep] = useState<'EMAIL' | 'OTP_DETAILS'>('EMAIL')
     const [isLoading, setIsLoading] = useState(false)
     const [devOtp, setDevOtp] = useState("")
 
     // Form State
-    const [phone, setPhone] = useState("")
+    const [verifiedEmail, setVerifiedEmail] = useState("")
     const [otp, setOtp] = useState("")
     const [formData, setFormData] = useState({
         name: "",
-        email: "",
+        phone: "", // Phone is now collected in step 2
         password: "",
         businessName: "",
         gstNumber: "",
@@ -41,23 +41,25 @@ export default function RegisterPage() {
     const handleSendOTP = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!/^[6-9]\d{9}$/.test(phone)) {
-            toast.error("Please enter a valid 10-digit Indian phone number")
+        const emailRegex = /^\S+@\S+\.\S+$/;
+
+        if (!emailRegex.test(verifiedEmail)) {
+            toast.error("Please enter a valid Email Address")
             return
         }
 
         setIsLoading(true)
-        const result = await sendOTP(phone)
+        const result = await sendOTP(verifiedEmail)
         setIsLoading(false)
 
         if (result.success) {
             setStep('OTP_DETAILS')
             if (result.devOtp) {
                 setDevOtp(result.devOtp)
-                setOtp(result.devOtp) // Auto-fill for convenience in dev
+                setOtp(result.devOtp)
                 toast.success(`Dev Mode OTP: ${result.devOtp}`, { duration: 5000 })
             } else {
-                toast.success("OTP sent. Please verify to continue.")
+                toast.success(`OTP sent to ${verifiedEmail}`)
             }
         } else {
             toast.error(result.message || "Failed to send OTP")
@@ -72,18 +74,24 @@ export default function RegisterPage() {
             return
         }
 
-        if (!formData.name || !formData.businessName || !formData.city || !formData.state) {
+        if (!formData.name || !formData.businessName || !formData.phone || !formData.city || !formData.state) {
             toast.error("Please fill in all required fields")
+            return
+        }
+
+        if (!/^[6-9]\d{9}$/.test(formData.phone)) {
+            toast.error("Please enter a valid 10-digit Indian phone number")
             return
         }
 
         setIsLoading(true)
         try {
             const payload = {
-                phone,
+                otpIdentifier: verifiedEmail,
                 otp,
                 name: formData.name,
-                email: formData.email,
+                email: verifiedEmail,
+                phone: formData.phone,
                 password: formData.password,
                 businessName: formData.businessName,
                 gstNumber: formData.gstNumber,
@@ -98,11 +106,9 @@ export default function RegisterPage() {
                 }
             }
 
-            // Call API directly since context usually handles login/verify only
             await authAPI.vendorSignup(payload)
 
             toast.success("Registration successful! Waiting for Admin Approval.")
-            // Redirect to Login page after successful registration
             setTimeout(() => router.push("/login"), 2000)
 
         } catch (error: any) {
@@ -125,18 +131,17 @@ export default function RegisterPage() {
                     <CardDescription>Join Paperbox to sell your products</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {step === 'PHONE' ? (
+                    {step === 'EMAIL' ? (
                         <form onSubmit={handleSendOTP} className="space-y-6 max-w-sm mx-auto">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Mobile Number</label>
+                                <label className="text-sm font-medium">Email Address</label>
                                 <div className="flex gap-2">
-                                    <span className="flex items-center justify-center w-12 border rounded-md bg-muted text-muted-foreground">+91</span>
                                     <input
-                                        type="tel"
+                                        type="email"
                                         className="flex-1 p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                                        placeholder="98765 43210"
+                                        value={verifiedEmail}
+                                        onChange={(e) => setVerifiedEmail(e.target.value)}
+                                        placeholder="vendor@company.com"
                                         required
                                         autoFocus
                                     />
@@ -151,7 +156,7 @@ export default function RegisterPage() {
                         <form onSubmit={handleRegister} className="space-y-6">
                             {/* OTP Section */}
                             <div className="bg-primary/5 p-4 rounded-lg border border-primary/20 mb-6">
-                                <label className="block text-sm font-medium mb-3 text-center">Verify OTP sent to +91 {phone}</label>
+                                <label className="block text-sm font-medium mb-3 text-center">Verify OTP sent to {verifiedEmail}</label>
                                 <div className="flex justify-center mb-2">
                                     <OTPInput length={6} value={otp} onChange={setOtp} disabled={isLoading} />
                                 </div>
@@ -167,8 +172,12 @@ export default function RegisterPage() {
                                     <input name="name" value={formData.name} onChange={handleChange} className="w-full p-2 border rounded-md" required />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-sm font-medium">Email *</label>
-                                    <input name="email" type="email" value={formData.email} onChange={handleChange} className="w-full p-2 border rounded-md" required />
+                                    <label className="text-sm font-medium">Email (Verified)</label>
+                                    <input type="email" value={verifiedEmail} disabled className="w-full p-2 border rounded-md bg-muted text-muted-foreground" />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Mobile Number *</label>
+                                    <input name="phone" value={formData.phone} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="9876543210" required />
                                 </div>
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Password *</label>
@@ -228,9 +237,9 @@ export default function RegisterPage() {
                     <p className="text-sm text-muted-foreground">
                         Already have an account? <Link href="/login" className="text-primary hover:underline">Login</Link>
                     </p>
-                    {step !== 'PHONE' && (
-                        <button onClick={() => setStep('PHONE')} className="text-xs text-muted-foreground hover:underline">
-                            Change Phone Number
+                    {step !== 'EMAIL' && (
+                        <button onClick={() => setStep('EMAIL')} className="text-xs text-muted-foreground hover:underline">
+                            Change Email
                         </button>
                     )}
                 </CardFooter>

@@ -12,8 +12,8 @@ import { Loader2 } from "lucide-react"
 import toast from "react-hot-toast"
 
 export default function LoginPage() {
-    const [step, setStep] = useState<'PHONE' | 'OTP'>('PHONE')
-    const [phone, setPhone] = useState("")
+    const [step, setStep] = useState<'IDENTIFIER' | 'OTP'>('IDENTIFIER')
+    const [identifier, setIdentifier] = useState("")
     const [otp, setOtp] = useState("")
     const [isLoading, setIsLoading] = useState(false)
     const [devOtp, setDevOtp] = useState("")
@@ -24,13 +24,15 @@ export default function LoginPage() {
     const handleSendOTP = async (e: React.FormEvent) => {
         e.preventDefault()
 
-        if (!/^[6-9]\d{9}$/.test(phone)) {
-            toast.error("Please enter a valid 10-digit Indian phone number")
+        const emailRegex = /^\S+@\S+\.\S+$/;
+
+        if (!emailRegex.test(identifier)) {
+            toast.error("Please enter a valid Email Address")
             return
         }
 
         setIsLoading(true)
-        const result = await sendOTP(phone)
+        const result = await sendOTP(identifier)
         setIsLoading(false)
 
         if (result.success) {
@@ -39,7 +41,7 @@ export default function LoginPage() {
                 setDevOtp(result.devOtp)
                 toast.success(`Dev Mode OTP: ${result.devOtp}`, { duration: 5000 })
             } else {
-                toast.success("OTP sent successfully")
+                toast.success(`OTP sent to ${identifier}`)
             }
         } else {
             toast.error(result.message || "Failed to send OTP")
@@ -53,7 +55,7 @@ export default function LoginPage() {
         }
 
         setIsLoading(true)
-        const result = await verifyOTP(phone, otp)
+        const result = await verifyOTP(identifier, otp)
         setIsLoading(false)
 
         if (result.success) {
@@ -70,33 +72,27 @@ export default function LoginPage() {
             <Card className="w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl">
-                        {step === 'PHONE' ? 'Welcome Back' : 'Verify Phone'}
+                        {step === 'IDENTIFIER' ? 'Welcome Back' : 'Verify Email'}
                     </CardTitle>
                     <CardDescription>
-                        {step === 'PHONE'
-                            ? 'Enter your phone number to continue'
-                            : `Enter the 6-digit code sent to +91 ${phone}`
+                        {step === 'IDENTIFIER'
+                            ? 'Enter your email address to continue'
+                            : `Enter the 6-digit code sent to ${identifier}`
                         }
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    {step === 'PHONE' ? (
+                    {step === 'IDENTIFIER' ? (
                         <form onSubmit={handleSendOTP} className="space-y-4">
                             <div className="space-y-2">
-                                <label className="text-sm font-medium">Phone Number</label>
+                                <label className="text-sm font-medium">Email Address</label>
                                 <div className="flex gap-2">
-                                    <span className="flex items-center justify-center w-12 border rounded-md bg-muted text-muted-foreground">
-                                        +91
-                                    </span>
                                     <input
-                                        type="tel"
+                                        type="email"
                                         className="flex-1 p-2 border rounded-md bg-background focus:ring-2 focus:ring-primary/20 outline-none"
-                                        value={phone}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(/\D/g, '').slice(0, 10)
-                                            setPhone(val)
-                                        }}
-                                        placeholder="98765 43210"
+                                        value={identifier}
+                                        onChange={(e) => setIdentifier(e.target.value)}
+                                        placeholder="user@example.com"
                                         required
                                         autoFocus
                                     />
@@ -131,10 +127,10 @@ export default function LoginPage() {
 
                             <div className="text-center">
                                 <button
-                                    onClick={() => { setStep('PHONE'); setOtp(""); setDevOtp("") }}
+                                    onClick={() => { setStep('IDENTIFIER'); setOtp(""); setDevOtp("") }}
                                     className="text-sm text-muted-foreground hover:text-primary underline"
                                 >
-                                    Change Phone Number
+                                    Change Email
                                 </button>
                             </div>
                         </div>

@@ -28,23 +28,34 @@ router.post('/logout', protect, asyncHandler(async (req, res) => {
 }));
 
 // @route   POST /api/auth/send-otp
-// @desc    Send OTP to phone number
+// @desc    Send OTP to phone number or email
 // @access  Public
 router.post('/send-otp', [
-  validators.phone,
+  validators.identifier,
   validate
 ], asyncHandler(async (req, res) => {
-  const { phone } = req.body;
+  const { identifier } = req.body;
   
   // Create and store OTP
-  const { otp } = await otpService.createOTP(phone, OTP_TYPES.LOGIN);
+  const { otp } = await otpService.createOTP(identifier, OTP_TYPES.LOGIN);
   
-  // Send OTP via SMS
-  const result = await otpService.sendOTP(phone, otp);
+  // Send OTP via SMS or Email
+  const result = await otpService.sendOTP(identifier, otp);
+  
+  if (!result.success) {
+    if (result.mock) {
+       // Allow dev mode/fallback to pass through
+    } else {
+        return res.status(500).json({
+        success: false,
+        message: result.error || 'Failed to send OTP'
+        });
+    }
+  }
   
   res.status(200).json({
     success: true,
-    message: 'OTP sent successfully',
+    message: `OTP sent to ${identifier}`,
     ...(result.mock && { devOtp: otp }) // Only include in dev mode
   });
 }));
@@ -53,14 +64,14 @@ router.post('/send-otp', [
 // @desc    Verify OTP and login/register user
 // @access  Public
 router.post('/verify-otp', [
-  validators.phone,
+  validators.identifier,
   validators.otp,
   validate
 ], asyncHandler(async (req, res) => {
-  const { phone, otp, name } = req.body;
+  const { identifier, otp, name } = req.body;
   
   // Verify OTP
-  const verification = await otpService.verifyOTP(phone, otp, OTP_TYPES.LOGIN);
+  const verification = await otpService.verifyOTP(identifier, otp, OTP_TYPES.LOGIN);
   
   if (!verification.valid) {
     return res.status(400).json({
@@ -71,17 +82,24 @@ router.post('/verify-otp', [
   }
   
   // Find or create user
-  let user = await User.findOne({ phone });
+  const isEmail = identifier.includes('@');
+  const query = isEmail ? { email: identifier } : { phone: identifier };
+  
+  let user = await User.findOne(query);
   let isNewUser = false;
   
   if (!user) {
     // Create new buyer account
-    user = await User.create({
-      phone,
-      name: name || `User ${phone.slice(-4)}`,
+    const userData = {
+      name: name || `User ${identifier.slice(0, 4)}...`,
       role: ROLES.BUYER,
       status: USER_STATUS.APPROVED
-    });
+    };
+    
+    if (isEmail) userData.email = identifier;
+    else userData.phone = identifier;
+
+    user = await User.create(userData);
     isNewUser = true;
   }
   
@@ -109,23 +127,33 @@ router.post('/vendor/signup', [
   validators.otp, // Add OTP validation
   validate
 ], asyncHandler(async (req, res) => {
-  const { phone, otp, name, email, password, businessName, gstNumber, razorpayKeyId, razorpayKeySecret, address } = req.body;
+  const { phone, otp, name, email, password, businessName, gstNumber, razorpayKeyId, razorpayKeySecret, address, otpIdentifier } = req.body;
   
   // Verify OTP first
-  const verification = await otpService.verifyOTP(phone, otp, OTP_TYPES.LOGIN);
+  // Use explicitly provided otpIdentifier, or fallback to phone (default)
+  const identifierToVerify = otpIdentifier || phone;
+  
+  const verification = await otpService.verifyOTP(identifierToVerify, otp, OTP_TYPES.LOGIN);
+  
   if (!verification.valid) {
+    // Try verifying against email if phone failed, just in case user sent email OTP but didn't send otpIdentifier
+    // (Optional robustness, but otpIdentifier is cleaner)
+    // For now, return error.
     return res.status(400).json({
       success: false,
       message: verification.message
     });
   }
 
-  // Check if phone already exists
-  const existingUser = await User.findOne({ phone });
+  // Check if phone/email already exists
+  const existingUser = await User.findOne({ 
+      $or: [{ phone }, { email }]
+  });
+  
   if (existingUser) {
     return res.status(400).json({
       success: false,
-      message: 'Phone number already registered'
+      message: 'Phone or Email already registered'
     });
   }
   
@@ -246,18 +274,20 @@ router.post('/admin/login-init', [
     });
   }
   
-  // Generate and send OTP to admin's phone
-  const { otp } = await otpService.createOTP(admin.phone, OTP_TYPES.LOGIN);
-  await otpService.sendOTP(admin.phone, otp);
+  // Generate and send OTP to admin's EMAIL
+  // User requested "email otp sending... for the admin Login too"
+  const { otp } = await otpService.createOTP(admin.email, OTP_TYPES.LOGIN);
+  await otpService.sendOTP(admin.email, otp);
 
-  // Mask phone number for display
-  const maskedPhone = admin.phone.replace(/.(?=.{4})/g, '*');
+  // Mask email for display
+  const maskedEmail = admin.email.replace(/(.{2})(.*)(?=@)/,
+    (gp1, gp2, gp3) => gp2 + "*".repeat(gp3.length));
   
   res.status(200).json({
     success: true,
-    message: `OTP sent to configured admin phone (${maskedPhone})`,
-    phone: maskedPhone,
-    tempId: admin._id // Send minimal info for next step
+    message: `OTP sent to admin email (${maskedEmail})`,
+    phone: maskedEmail, // Keeping field name 'phone' for frontend compatibility if needed, or change frontend
+    tempId: admin._id 
   });
 }));
 
@@ -271,15 +301,15 @@ router.post('/admin/login-verify', [
 ], asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  // Find admin to get phone number for verification
+  // Find admin
   const admin = await User.findOne({ email, role: ROLES.ADMIN });
 
   if (!admin) {
     return res.status(401).json({ success: false, message: 'Admin not found' });
   }
 
-  // Verify OTP
-  const verification = await otpService.verifyOTP(admin.phone, otp, OTP_TYPES.LOGIN);
+  // Verify OTP against EMAIL
+  const verification = await otpService.verifyOTP(admin.email, otp, OTP_TYPES.LOGIN);
   
   if (!verification.valid) {
     return res.status(400).json({
@@ -366,18 +396,22 @@ router.post('/vendor/forgot-password/init', [
       message: 'Vendor not found'
     });
   }
+
+  // Determine which identifier to usage for OTP (prefer Email if identifier is email, else Phone)
+  // Actually, we should send to the identifier the user PROVIDED if it matches.
+  // OR, we send to the verified contact method.
+  // Let's send to the `identifier` passed, assuming it matches the user record found.
+  // But we need to use the actual value from the DB to be safe/clean? 
+  // No, use the input `identifier` so `verifyOTP` works with the same string.
   
   // Create and send OTP
-  const { otp } = await otpService.createOTP(vendor.phone, OTP_TYPES.FORGOT_PASSWORD);
-  const result = await otpService.sendOTP(vendor.phone, otp);
-  
-  // Mask phone for response
-  const maskedPhone = vendor.phone.replace(/.(?=.{4})/g, '*');
+  const { otp } = await otpService.createOTP(identifier, OTP_TYPES.FORGOT_PASSWORD);
+  const result = await otpService.sendOTP(identifier, otp);
   
   res.status(200).json({
     success: true,
-    message: `OTP sent to registered phone number (${maskedPhone})`,
-    phone: maskedPhone,
+    message: `OTP sent to ${identifier}`,
+    phone: identifier,
     ...(result.mock && { devOtp: otp })
   });
 }));
@@ -406,8 +440,8 @@ router.post('/vendor/forgot-password/reset', [
     });
   }
   
-  // Verify OTP
-  const verification = await otpService.verifyOTP(vendor.phone, otp, OTP_TYPES.FORGOT_PASSWORD);
+  // Verify OTP against identifier
+  const verification = await otpService.verifyOTP(identifier, otp, OTP_TYPES.FORGOT_PASSWORD);
   
   if (!verification.valid) {
     return res.status(400).json({

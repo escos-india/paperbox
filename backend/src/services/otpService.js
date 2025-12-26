@@ -1,14 +1,29 @@
 const axios = require('axios');
+const nodemailer = require('nodemailer');
 const OTP = require('../models/OTP');
 const { getConfig } = require('../config/env.config');
 const { OTP_TYPES } = require('../config/constants');
 
 class OTPService {
   constructor() {
+    // SMS Config
     const key = getConfig('FAST2SMS_API_KEY');
     this.apiKey = key ? key.trim() : '';
-    console.log("DEBUG: OTP Service API Key loaded:", this.apiKey ? (this.apiKey.substring(0, 5) + "...") : "NULL/EMPTY");
     this.baseUrl = 'https://www.fast2sms.com/dev/bulkV2';
+
+    // Email Config
+    this.emailUser = getConfig('SMTP_USER');
+    this.transporter = nodemailer.createTransport({
+        host: getConfig('SMTP_HOST'),
+        port: getConfig('SMTP_PORT'),
+        secure: false, // true for 465, false for other ports
+        auth: {
+            user: this.emailUser,
+            pass: getConfig('SMTP_PASS')
+        }
+    });
+
+    console.log("DEBUG: OTP Service Initialized. Email User:", this.emailUser || "Not Configured");
   }
 
   // Generate a random 6-digit OTP
@@ -16,111 +31,180 @@ class OTPService {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
 
+  // Helper to determine if identifier is email
+  isEmail(identifier) {
+      return /^\S+@\S+\.\S+$/.test(identifier);
+  }
+
   // Create and store OTP in database
-  async createOTP(phone, type = OTP_TYPES.LOGIN) {
-    // Delete any existing OTPs for this phone and type
-    await OTP.deleteMany({ phone, type });
+  async createOTP(identifier, type = OTP_TYPES.LOGIN) {
+    const isEmail = this.isEmail(identifier);
+    const query = { type };
+    if (isEmail) query.email = identifier;
+    else query.phone = identifier;
+
+    // Delete any existing OTPs for this identifier and type
+    await OTP.deleteMany(query);
 
     const otp = this.generateOTP();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    const otpDoc = await OTP.create({
-      phone,
+    const otpData = {
       otp,
       type,
       expiresAt
-    });
+    };
+
+    if (isEmail) otpData.email = identifier;
+    else otpData.phone = identifier;
+
+    const otpDoc = await OTP.create(otpData);
 
     return { otp, otpDoc };
   }
 
+  // Send OTP (Route to SMS or Email)
+  async sendOTP(identifier, otp) {
+      if (this.isEmail(identifier)) {
+          return this.sendEmailOTP(identifier, otp);
+      } else {
+          return this.sendSMS(identifier, otp);
+      }
+  }
+
+  // Send OTP via Email
+  async sendEmailOTP(email, otp) {
+      if (!this.emailUser) {
+          console.error("❌ Email Service Error: Missing 'SMTP_USER' or 'SMTP_PASS' in environment variables");
+          return { success: false, error: "Email service not configured" };
+      }
+
+      try {
+          const info = await this.transporter.sendMail({
+              from: `"Paperbox" <${this.emailUser}>`,
+              to: email,
+              subject: "Your Paperbox Login OTP",
+              text: `Your OTP for Paperbox is ${otp}. It is valid for 5 minutes.`,
+              html: `
+                <div style="font-family: Arial, sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+                  <h2 style="color: #333;">Paperbox Login Verification</h2>
+                  <p>Hello,</p>
+                  <p>Your One-Time Password (OTP) for logging in to Paperbox is:</p>
+                  <h1 style="color: #007bff; letter-spacing: 5px;">${otp}</h1>
+                  <p>This OTP is valid for 5 minutes. Do not share this with anyone.</p>
+                  <p style="font-size: 12px; color: #888;">If you did not request this, please ignore this email.</p>
+                </div>
+              `
+          });
+
+          console.log(`✅ Email OTP sent to ${email}: ${info.messageId}`);
+          return { success: true, method: 'email' };
+      } catch (error) {
+          console.error("❌ Email sending failed:", error);
+          // Fallback to mock if in dev and email fails? No, let's report error.
+          // But for strict "dev mode" without credentials, maybe log it.
+           if (getConfig('NODE_ENV') === 'development') {
+              console.log(`📧 [MOCK EMAIL] OTP for ${email}: ${otp}`);
+              return { success: true, mock: true, devOtp: otp };
+           }
+
+          return { success: false, error: "Failed to send email OTP" };
+      }
+  }
+
   // Send OTP via Fast2SMS
-  async sendOTP(phone, otp) {
-    // If no valid API key is provided, use mock mode (log to console)
-    // We allow real SMS even in development if a key is present
+  async sendSMS(phone, otp) {
+    // Check for API key
     if (!this.apiKey || this.apiKey === 'your-fast2sms-api-key-here') {
-      console.log(`📱 [DEV MODE] OTP for ${phone}: ${otp}`);
-      return { success: true, mock: true };
+       console.error("❌ SMS Service Error: Missing 'FAST2SMS_API_KEY' in environment variables.");
+       return { success: false, error: "SMS service not configured" };
     }
 
     try {
-      // Trying compatible approach: Header for Auth, Query Params for Data
-      const response = await axios.post(this.baseUrl, null, {
-          params: {
+      const dltTemplateId = getConfig('FAST2SMS_DLT_TEMPLATE_ID');
+      const senderId = getConfig('FAST2SMS_SENDER_ID'); 
+
+      let params = {};
+      
+      if (dltTemplateId && senderId) {
+          params = {
+            route: 'dlt',
+            sender_id: senderId,
+            message: dltTemplateId,
+            variables_values: otp,
+            flash: 0,
+            numbers: phone
+          };
+      } else {
+          params = {
             route: 'otp',
             variables_values: otp,
             flash: 0,
             numbers: phone
-          },
-          headers: {
-            "authorization": this.apiKey
-          }
+          };
+      }
+
+      const response = await axios.post(this.baseUrl, null, {
+          params: params,
+          headers: { "Authorization": this.apiKey }
       });
 
       if (response.data.return === true) {
-        console.log(`✅ OTP sent to ${phone}`);
-        return { success: true, data: response.data };
+        console.log(`✅ SMS sent to ${phone}`);
+        return { success: true, data: response.data, method: 'sms' };
       } else {
-        console.error(`❌ Failed to send OTP:`, response.data);
+        console.error(`❌ Failed to send SMS:`, response.data);
         return { success: false, error: response.data.message };
       }
     } catch (error) {
-      console.error(`❌ OTP sending error:`, error.message);
-      
-      // In case of API failure, log OTP for testing
-      console.log(`📱 [FALLBACK] OTP for ${phone}: ${otp}`);
-      return { success: true, mock: true, fallback: true };
+      console.error(`❌ SMS sending error:`, error.message);
+      if (error.response) console.error(`❌ API Response Data:`, JSON.stringify(error.response.data, null, 2));
+      return { success: false, error: error.response?.data?.message || "Failed to send SMS" };
     }
   }
 
   // Verify OTP
-  async verifyOTP(phone, inputOtp, type = OTP_TYPES.LOGIN) {
-    console.log(`🔍 Verifying OTP: Phone=${phone}, OTP=${inputOtp}, Type=${type}`);
+  async verifyOTP(identifier, inputOtp, type = OTP_TYPES.LOGIN) {
+    console.log(`🔍 Verifying OTP: ID=${identifier}, OTP=${inputOtp}, Type=${type}`);
     
-    // Ensure phone is string
-    phone = String(phone).trim();
+    // Ensure strings
+    identifier = String(identifier).trim();
     inputOtp = String(inputOtp).trim();
+    const isEmail = this.isEmail(identifier);
 
-    const otpDoc = await OTP.findOne({ phone, type }).sort({ createdAt: -1 });
-    // sort by latest because createOTP only deletes "type" matching, ensuring we get the newest if race condition
-    
-    if (!otpDoc) {
-      console.log(`❌ OTP Verification Failed: No record found for ${phone}`);
-      return { valid: false, message: 'OTP not found. Please request a new one.' };
+    const query = { type };
+    if (isEmail) {
+        query.email = identifier.toLowerCase();
+    } else {
+        query.phone = identifier;
     }
 
-    console.log(`FOUND OTP Record: ID=${otpDoc._id}, Expected=${otpDoc.otp}, Attempts=${otpDoc.attempts}`);
+    const otpDoc = await OTP.findOne(query).sort({ createdAt: -1 });
+    
+    if (!otpDoc) {
+      return { valid: false, message: 'OTP not found or expired. Please request a new one.' };
+    }
 
     if (otpDoc.isExpired()) {
-      console.log(`❌ OTP Verification Failed: Expired`);
       await OTP.deleteOne({ _id: otpDoc._id });
-      return { valid: false, message: 'OTP has expired. Please request a new one.' };
+      return { valid: false, message: 'OTP has expired.' };
     }
 
     if (otpDoc.hasExceededAttempts()) {
-      console.log(`❌ OTP Verification Failed: Too many attempts`);
       await OTP.deleteOne({ _id: otpDoc._id });
-      return { valid: false, message: 'Too many attempts. Please request a new OTP.' };
+      return { valid: false, message: 'Too many attempts.' };
     }
 
     if (otpDoc.otp !== inputOtp) {
-      console.log(`❌ OTP Verification Failed: Mismatch (Input: ${inputOtp} !== Expected: ${otpDoc.otp})`);
       await otpDoc.incrementAttempts();
-      return { 
-        valid: false, 
-        message: 'Invalid OTP. Please try again.',
-        attemptsLeft: otpDoc.maxAttempts - otpDoc.attempts
-      };
+      return { valid: false, message: 'Invalid OTP.', attemptsLeft: otpDoc.maxAttempts - otpDoc.attempts };
     }
 
-    // OTP is valid - mark as verified and delete
-    console.log(`✅ OTP Verification SUCCESS`);
+    // Success
     await OTP.deleteOne({ _id: otpDoc._id });
-    
     return { valid: true, message: 'OTP verified successfully' };
   }
 
-  // Generate delivery OTP (4 digits for simplicity)
   generateDeliveryOTP() {
     return Math.floor(1000 + Math.random() * 9000).toString();
   }

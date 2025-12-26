@@ -4,8 +4,14 @@ const { OTP_TYPES } = require('../config/constants');
 const otpSchema = new mongoose.Schema({
   phone: {
     type: String,
-    required: [true, 'Phone number is required'],
+    required: false,
     trim: true
+  },
+  email: {
+    type: String,
+    required: false,
+    trim: true,
+    lowercase: true
   },
   otp: {
     type: String,
@@ -55,5 +61,6 @@ otpSchema.methods.incrementAttempts = async function() {
 
 // Indexes
 otpSchema.index({ phone: 1, type: 1 });
+otpSchema.index({ email: 1, type: 1 });
 
 module.exports = mongoose.model('OTP', otpSchema);

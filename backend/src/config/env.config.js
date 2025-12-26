@@ -55,12 +55,16 @@ const defaults = {
   ENCRYPTION_KEY: 'paperbox-encryption-key-32chars!',
   ADMIN_RAZORPAY_KEY_ID: 'rzp_test_mock_admin_key',
   ADMIN_RAZORPAY_KEY_SECRET: 'mock_admin_secret_key',
-  FAST2SMS_API_KEY: '',
+  FAST2SMS_API_KEY: 'KEnRPyNJiY1Ofm4xz2SAb60TMjcLklohwg9WDdHte7uU8qCpVZq1ICwBzHsAWxc7YP9ReE28fN0kbpQZ',
   ADMIN_PHONE: '9999999999',
   ADMIN_EMAIL: 'admin@paperbox.com',
   ADMIN_PASSWORD: 'Admin@123',
   ADMIN_SECRET_KEY: 'PAPERBOX-ADMIN-2024',
-  FRONTEND_URL: 'http://localhost:3000'
+  FRONTEND_URL: 'http://localhost:3000',
+  SMTP_HOST: "smtp.gmail.com",  
+  SMTP_PORT: "587",
+  SMTP_USER: "suyashaher99@gmail.com",
+  SMTP_PASS: "houe bppc ijbn pcrp"
 };
 
 // Export a function to get config values
