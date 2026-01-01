@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Hero } from "@/components/sections/hero"
-import { TrustStrip } from "@/components/sections/trust-strip"
+// import { TrustStrip } from "@/components/sections/trust-strip"
 import { Services } from "@/components/sections/services"
 import { Process } from "@/components/sections/process"
 import { WhyUs } from "@/components/sections/why-us"
@@ -16,11 +16,12 @@ export default function Home() {
   const { user, isLoading } = useAuth()
   const router = useRouter()
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login")
-    }
-  }, [user, isLoading, router])
+  // Redirect logic removed to allow public access
+  // useEffect(() => {
+  //   if (!isLoading && !user) {
+  //     router.push("/login")
+  //   }
+  // }, [user, isLoading, router])
 
   if (isLoading) {
     return (
@@ -30,14 +31,14 @@ export default function Home() {
     )
   }
 
-  if (!user) {
-    return null // Will redirect
-  }
+  // if (!user) {
+  //   return null // Will redirect
+  // }
 
   return (
     <div className="flex flex-col min-h-screen">
       <Hero />
-      <TrustStrip />
+      {/* <TrustStrip /> */}
       <Services />
       <Process />
       <WhyUs />

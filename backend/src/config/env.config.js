@@ -63,8 +63,8 @@ const defaults = {
   FRONTEND_URL: 'http://localhost:3000',
   SMTP_HOST: "smtp.gmail.com",  
   SMTP_PORT: "587",
-  SMTP_USER: "suyashaher99@gmail.com",
-  SMTP_PASS: "houe bppc ijbn pcrp"
+  SMTP_USER: "harshalaute85@gmail.com",
+  SMTP_PASS: "rphm foyi esmq xgca"
 };
 
 // Export a function to get config values

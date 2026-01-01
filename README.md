@@ -77,3 +77,5 @@ Make sure to configure your environment variables.
 - `npm run start`: Runs the backend server.
 - `npm run seed`: Seeds the database with initial data.
 - `npm test`: Runs backend tests.
+
+

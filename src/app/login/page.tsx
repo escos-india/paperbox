@@ -138,7 +138,7 @@ export default function LoginPage() {
                 </CardContent>
                 <CardFooter className="flex justify-center border-t pt-6 mt-2">
                     <p className="text-sm text-muted-foreground">
-                        Vendor? <Link href="/paperbox/admin" className="text-primary hover:underline">Partner Login</Link>
+                        Vendor? <Link href="/paperbox/admin" className="text-primary hover:underline">Vendor Login</Link>
                     </p>
                 </CardFooter>
             </Card>

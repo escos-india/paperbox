@@ -11,6 +11,7 @@ const User = require('../models/User');
 const BlacklistedToken = require('../models/BlacklistedToken');
 const { ROLES, USER_STATUS, OTP_TYPES } = require('../config/constants');
 const { getConfig } = require('../config/env.config');
+const { sendSecurityAlert, checkRateLimit, recordFailedAttempt, resetAttempts } = require('../middleware/adminSecurityMiddleware');
 
 // @route   POST /api/auth/logout
 // @desc    Logout user (blacklist token)
@@ -237,22 +238,30 @@ router.post('/vendor/login', [
 
 // @route   POST /api/auth/admin/login-init
 // @desc    Admin login step 1: Validate credentials and send OTP
-// @access  Public
+// @access  Public (with rate limiting)
 router.post('/admin/login-init', [
+  checkRateLimit, // Rate limiting middleware
   body('email').isEmail().withMessage('Valid email required'),
   body('password').notEmpty().withMessage('Password required'),
   body('secretKey').notEmpty().withMessage('Secret key required'),
   validate
 ], asyncHandler(async (req, res) => {
   const { email, password, secretKey } = req.body;
+  const ip = req.ip || req.connection.remoteAddress || 'unknown';
+  
+  // Send access alert (someone is attempting admin login)
+  await sendSecurityAlert('ACCESS', ip);
   
   // Find admin by email
   const admin = await User.findOne({ email, role: ROLES.ADMIN }).select('+password +secretKey');
   
   if (!admin) {
+    // Record failed attempt
+    const result = await recordFailedAttempt(ip);
     return res.status(401).json({
       success: false,
-      message: 'Invalid credentials'
+      message: 'Invalid credentials',
+      attemptsLeft: result.attemptsLeft
     });
   }
   
@@ -260,19 +269,29 @@ router.post('/admin/login-init', [
   const isPasswordValid = await admin.comparePassword(password);
   
   if (!isPasswordValid) {
+    // Record failed attempt
+    const result = await recordFailedAttempt(ip);
     return res.status(401).json({
       success: false,
-      message: 'Invalid credentials'
+      message: 'Invalid credentials',
+      attemptsLeft: result.attemptsLeft
     });
   }
   
-  // Verify secret key
-  if (admin.secretKey !== secretKey) {
+  // Verify secret key (using bcrypt comparison)
+  const isSecretKeyValid = await admin.compareSecretKey(secretKey);
+  if (!isSecretKeyValid) {
+    // Record failed attempt
+    const result = await recordFailedAttempt(ip);
     return res.status(401).json({
       success: false,
-      message: 'Invalid secret key'
+      message: 'Invalid secret key',
+      attemptsLeft: result.attemptsLeft
     });
   }
+  
+  // Reset attempts on successful credential verification
+  resetAttempts(ip);
   
   // Generate and send OTP to admin's EMAIL
   // User requested "email otp sending... for the admin Login too"
@@ -352,27 +371,47 @@ router.get('/me', protect, asyncHandler(async (req, res) => {
 router.put('/profile', protect, [
   body('name').optional().trim().isLength({ min: 2, max: 100 }),
   body('email').optional().isEmail(),
+  body('phone').optional().matches(/^[6-9]\d{9}$/).withMessage('Valid 10-digit Indian phone number required'),
   body('address').optional().isObject(),
+  body('businessName').optional().trim(),
+  body('gstNumber').optional().trim(),
   validate
 ], asyncHandler(async (req, res) => {
-  const { name, email, address } = req.body;
+  const { name, email, phone, address, businessName, gstNumber } = req.body;
   
   const updateData = {};
   if (name) updateData.name = name;
   if (email) updateData.email = email;
-  if (address) updateData.address = address;
+  if (phone) updateData.phone = phone;
+  if (address) updateData.address = address; // Mongoose should handle subdoc update if passed as object
   
-  const user = await User.findByIdAndUpdate(
-    req.user._id,
-    updateData,
-    { new: true, runValidators: true }
-  );
+  // Vendor specific fields
+  if (req.user.role === ROLES.VENDOR) {
+    if (businessName) updateData.businessName = businessName;
+    if (gstNumber) updateData.gstNumber = gstNumber;
+  }
   
-  res.status(200).json({
-    success: true,
-    message: 'Profile updated',
-    user
-  });
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+    
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated',
+      user
+    });
+  } catch (err) {
+    if (err.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email or Phone already in use'
+      });
+    }
+    throw err;
+  }
 }));
 
 // @route   POST /api/auth/vendor/forgot-password/init

@@ -100,18 +100,31 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Hash password before saving (for admin)
+// Hash password before saving (for admin/vendor)
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password') || !this.password) return next();
+  // Hash password if modified
+  if (this.isModified('password') && this.password) {
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
   
-  const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
+  // Hash secretKey if modified (for admin)
+  if (this.isModified('secretKey') && this.secretKey) {
+    const salt = await bcrypt.genSalt(12);
+    this.secretKey = await bcrypt.hash(this.secretKey, salt);
+  }
+  
   next();
 });
 
 // Compare password method
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
+};
+
+// Compare secretKey method (for admin)
+userSchema.methods.compareSecretKey = async function(candidateSecretKey) {
+  return await bcrypt.compare(candidateSecretKey, this.secretKey);
 };
 
 // Remove sensitive fields from JSON output

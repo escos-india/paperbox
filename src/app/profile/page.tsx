@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Section } from "@/components/ui/section"
 import { User, Building, MapPin, Briefcase, LogOut, Package } from "lucide-react"
+import { EditProfileDialog } from "@/components/profile/EditProfileDialog"
 
 export default function ProfilePage() {
     const { user, logout, isLoading: authLoading } = useAuth()
@@ -26,6 +27,7 @@ export default function ProfilePage() {
                 <div className="flex items-center justify-between mb-8">
                     <h1 className="text-3xl font-bold">My Profile</h1>
                     <div className="flex gap-2">
+                        <EditProfileDialog user={user} onUpdate={() => window.location.reload()} />
                         <Button variant="outline" onClick={() => router.push("/paperbox/buyer/orders")}>
                             <Package className="h-4 w-4 mr-2" /> My Orders
                         </Button>
