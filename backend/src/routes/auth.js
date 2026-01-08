@@ -6,6 +6,8 @@ const { protect, generateToken } = require('../middleware/auth');
 const { asyncHandler } = require('../middleware/errorHandler');
 const otpService = require('../services/otpService');
 const paymentService = require('../services/paymentService');
+const cloudinaryService = require('../services/cloudinaryService');
+const upload = require('../middleware/upload');
 
 const User = require('../models/User');
 const BlacklistedToken = require('../models/BlacklistedToken');
@@ -123,23 +125,22 @@ router.post('/verify-otp', [
 // @route   POST /api/auth/vendor/signup
 // @desc    Register as vendor
 // @access  Public
-router.post('/vendor/signup', [
+// @route   POST /api/auth/vendor/signup
+// @desc    Register as vendor (with QR Code)
+// @access  Public
+router.post('/vendor/signup', upload.single('qrCode'), [
   ...validators.vendorRegistration,
-  validators.otp, // Add OTP validation
+  validators.otp, 
   validate
 ], asyncHandler(async (req, res) => {
-  const { phone, otp, name, email, password, businessName, gstNumber, razorpayKeyId, razorpayKeySecret, address, otpIdentifier } = req.body;
+  // Extract fields - note that with formData, numerical values might come as strings
+  const { phone, otp, name, email, password, businessName, gstNumber, address, otpIdentifier } = req.body;
   
   // Verify OTP first
-  // Use explicitly provided otpIdentifier, or fallback to phone (default)
   const identifierToVerify = otpIdentifier || phone;
-  
   const verification = await otpService.verifyOTP(identifierToVerify, otp, OTP_TYPES.LOGIN);
   
   if (!verification.valid) {
-    // Try verifying against email if phone failed, just in case user sent email OTP but didn't send otpIdentifier
-    // (Optional robustness, but otpIdentifier is cleaner)
-    // For now, return error.
     return res.status(400).json({
       success: false,
       message: verification.message
@@ -158,11 +159,17 @@ router.post('/vendor/signup', [
     });
   }
   
-  // Encrypt Razorpay keys if provided
-  let encryptedKeyId, encryptedKeySecret;
-  if (razorpayKeyId && razorpayKeySecret) {
-    encryptedKeyId = paymentService.encryptKey(razorpayKeyId);
-    encryptedKeySecret = paymentService.encryptKey(razorpayKeySecret);
+  // Handle QR Code Upload
+  let qrCodeUrl = '';
+  if (req.file) {
+    const result = await cloudinaryService.uploadFromBuffer(
+      req.file.buffer,
+      { folder: `paperbox/users/pending-${Date.now()}/qr-code` }
+    );
+    
+    if (result.success) {
+      qrCodeUrl = result.url;
+    }
   }
   
   // Create vendor (pending approval)
@@ -170,14 +177,13 @@ router.post('/vendor/signup', [
     phone,
     name,
     email,
-    password, // Save password (will be hashed by pre-save)
+    password, 
     businessName,
     gstNumber,
     role: ROLES.VENDOR,
     status: USER_STATUS.PENDING,
-    address: address || {},
-    razorpayKeyId: encryptedKeyId,
-    razorpayKeySecret: encryptedKeySecret
+    address: typeof address === 'string' ? JSON.parse(address) : (address || {}), // Handle potential stringified JSON from FormData
+    qrCode: qrCodeUrl
   });
   
   res.status(201).json({
@@ -375,6 +381,7 @@ router.put('/profile', protect, [
   body('address').optional().isObject(),
   body('businessName').optional().trim(),
   body('gstNumber').optional().trim(),
+  body('qrCode').optional().trim(),
   validate
 ], asyncHandler(async (req, res) => {
   const { name, email, phone, address, businessName, gstNumber } = req.body;
@@ -389,6 +396,7 @@ router.put('/profile', protect, [
   if (req.user.role === ROLES.VENDOR) {
     if (businessName) updateData.businessName = businessName;
     if (gstNumber) updateData.gstNumber = gstNumber;
+    if (req.body.qrCode) updateData.qrCode = req.body.qrCode;
   }
   
   try {

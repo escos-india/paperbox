@@ -212,6 +212,102 @@ function VendorOrderDetailsContent() {
                 </CardContent>
             </Card>
 
+            {/* Payment Verification Section */}
+            {
+                (!order.isPaymentVerified && order.transactionId) && (
+                    <Card className="mb-8 border-amber-200 bg-amber-50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-amber-700">
+                                Payment Verification Needed
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-col md:flex-row gap-6 justify-between items-start md:items-center">
+                                <div>
+                                    <p className="font-medium text-amber-900">Buyer submitted payment details:</p>
+                                    <p className="mt-1">Transaction ID: <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border">{order.transactionId}</span></p>
+                                    {order.paymentProof && (
+                                        <a href={order.paymentProof} target="_blank" rel="noreferrer" className="text-sm text-blue-600 underline mt-1 block">View Payment Proof</a>
+                                    )}
+                                </div>
+                                <Button
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                    onClick={async () => {
+                                        if (!window.confirm("Verify this payment? This will confirm the order.")) return;
+                                        try {
+                                            await vendorAPI.verifyPayment(order._id);
+                                            toast.success("Payment Verified!");
+                                            fetchOrder(order._id);
+                                        } catch (e) {
+                                            toast.error("Failed to verify payment");
+                                        }
+                                    }}
+                                >
+                                    Verify Payment
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )
+            }
+
+            {/* Refund Request Section */}
+            {
+                (order.refundRequested) && (
+                    <Card className="mb-8 border-red-200 bg-red-50">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-red-700">
+                                Refund Request
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="mb-4">
+                                <p className="font-medium text-red-900">Reason:</p>
+                                <p className="bg-white p-3 rounded border border-red-100 mt-1">{order.refundReason}</p>
+                                <p className="text-sm mt-2">Status: <span className="font-bold">{order.refundStatus || 'PENDING'}</span></p>
+                            </div>
+
+                            {order.refundStatus === 'PENDING' && (
+                                <div className="flex gap-4">
+                                    <Button
+                                        variant="default"
+                                        className="bg-green-600 hover:bg-green-700"
+                                        onClick={async () => {
+                                            const note = window.prompt("Approve Note (optional):");
+                                            try {
+                                                await vendorAPI.refundDecision(order._id, { status: 'APPROVED', note: note || undefined });
+                                                toast.success("Refund Approved");
+                                                fetchOrder(order._id);
+                                            } catch (e) {
+                                                toast.error("Failed to approve refund");
+                                            }
+                                        }}
+                                    >
+                                        Approve Refund
+                                    </Button>
+                                    <Button
+                                        variant="destructive"
+                                        onClick={async () => {
+                                            const note = window.prompt("Rejection Reason (optional):");
+                                            try {
+                                                await vendorAPI.refundDecision(order._id, { status: 'REJECTED', note: note || undefined });
+                                                toast.success("Refund Rejected");
+                                                fetchOrder(order._id);
+                                            } catch (e) {
+                                                toast.error("Failed to reject refund");
+                                            }
+                                        }}
+                                    >
+                                        Reject Refund
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )
+            }
+
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-6">
@@ -314,11 +410,12 @@ function VendorOrderDetailsContent() {
                         <CardContent>
                             <div className="space-y-1 text-sm">
                                 <p className="text-muted-foreground">Method</p>
-                                <p className="font-medium">Pay on Delivery</p>
+                                <p className="font-medium">{order.isManual ? "Manual / QR" : "Online"}</p>
                                 <p className="text-muted-foreground mt-2">Status</p>
-                                <p className={`font-medium capitalize ${order.paymentId?.status === 'success' ? 'text-green-600' : 'text-amber-600'}`}>
-                                    {order.paymentId?.status || 'Pending'}
+                                <p className={`font-medium capitalize ${order.isPaymentVerified ? 'text-green-600' : 'text-amber-600'}`}>
+                                    {order.isPaymentVerified ? "Paid" : (order.transactionId ? "Verification Pending" : "Payment Pending")}
                                 </p>
+                                {order.transactionId && <p className="text-xs text-muted-foreground mt-1">Ref: {order.transactionId}</p>}
                             </div>
                         </CardContent>
                     </Card>

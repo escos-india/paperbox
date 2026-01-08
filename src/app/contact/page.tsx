@@ -16,8 +16,26 @@ export default function ContactPage() {
         e.preventDefault()
         setIsSubmitting(true)
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500))
+        const formData = new FormData(e.currentTarget)
+        const name = formData.get('name') as string
+        const company = formData.get('company') as string
+        const email = formData.get('email') as string
+        const phone = formData.get('phone') as string
+        const message = formData.get('message') as string
+
+        const whatsappMessage = `*New Contact Form Submission*
+        
+*Name:* ${name}
+*Company:* ${company}
+*Email:* ${email}
+*Phone:* ${phone}
+
+*Message:*
+${message}`
+
+        const whatsappUrl = `https://wa.me/917058433905?text=${encodeURIComponent(whatsappMessage)}`
+
+        window.open(whatsappUrl, '_blank')
 
         setIsSubmitting(false)
         setIsSuccess(true)
@@ -98,22 +116,22 @@ export default function ContactPage() {
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <label htmlFor="name" className="text-sm font-medium">Name</label>
-                                                <Input id="name" required placeholder="John Doe" />
+                                                <Input id="name" name="name" required placeholder="John Doe" />
                                             </div>
                                             <div className="space-y-2">
                                                 <label htmlFor="company" className="text-sm font-medium">Company</label>
-                                                <Input id="company" required placeholder="Acme Corp" />
+                                                <Input id="company" name="company" required placeholder="Acme Corp" />
                                             </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-2">
                                                 <label htmlFor="email" className="text-sm font-medium">Email</label>
-                                                <Input id="email" type="email" required placeholder="john@company.com" />
+                                                <Input id="email" name="email" type="email" required placeholder="john@company.com" />
                                             </div>
                                             <div className="space-y-2">
                                                 <label htmlFor="phone" className="text-sm font-medium">Phone</label>
-                                                <Input id="phone" type="tel" required placeholder="+91 98765 43210" />
+                                                <Input id="phone" name="phone" type="tel" required placeholder="+91 98765 43210" />
                                             </div>
                                         </div>
 
@@ -121,6 +139,7 @@ export default function ContactPage() {
                                             <label htmlFor="message" className="text-sm font-medium">Requirement Description</label>
                                             <Textarea
                                                 id="message"
+                                                name="message"
                                                 required
                                                 placeholder="We are looking to upgrade our server infrastructure..."
                                                 className="min-h-[150px]"

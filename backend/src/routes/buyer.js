@@ -218,14 +218,14 @@ router.post('/checkout', protect, [
     
     orders.push(order);
     
-    // Create Pay-on-Delivery Order
+    // Create Pay-on-Delivery / Manual Payment Order
     try {
-      // Create payment record (Pending, COD)
+      // Create payment record (Pending)
       const payment = await Payment.create({
         orderId: order._id,
         vendorId: group.vendorId,
         buyerId: req.user._id,
-        razorpayOrderId: `cod_${order.orderId}`, // Placeholder for COD
+        razorpayOrderId: `manual_${order.orderId}`, // Placeholder
         amount: totalAmount,
         status: PAYMENT_STATUS.PENDING
       });
@@ -233,13 +233,12 @@ router.post('/checkout', protect, [
       order.paymentId = payment._id;
       await order.save();
       
-      // We don't need a razorpay order for COD/Pay-on-Delivery
       paymentOrders.push({
         orderId: order._id,
         orderNumber: order.orderId,
         vendorId: group.vendorId,
         amount: totalAmount,
-        isCOD: true
+        isManual: true
       });
     } catch (error) {
       console.error('Order creation error:', error);
@@ -400,7 +399,7 @@ router.get('/orders/:id', protect, [
     buyerId: req.user._id
   })
     .select('+deliveryOtp')
-    .populate('vendorId', 'businessName phone')
+    .populate('vendorId', 'businessName phone qrCode')
     .populate('paymentId');
   
   if (!order) {
@@ -456,15 +455,54 @@ router.post('/orders/:id/verify-delivery', protect, [
   });
 }));
 
-// @route   POST /api/orders/:id/refund
-// @desc    Request refund
+// @route   POST /api/orders/:id/confirm-payment
+// @desc    Buyer confirms payment with transaction ID
 // @access  Private
-router.post('/orders/:id/refund', protect, [
+router.post('/orders/:id/confirm-payment', protect, [
   validators.mongoId('id'),
-  ...validators.refundRequest,
+  body('transactionId').notEmpty().withMessage('Transaction ID is required'),
+  body('paymentProof').optional(),
   validate
 ], asyncHandler(async (req, res) => {
-  const { reason, requestedAmount } = req.body;
+  const { transactionId, paymentProof } = req.body;
+  
+  const order = await Order.findOne({
+    _id: req.params.id,
+    buyerId: req.user._id
+  });
+  
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+
+  // Update order with payment details
+  order.transactionId = transactionId;
+  order.paymentProof = paymentProof;
+  order.isPaymentVerified = false; // Needs vendor verification
+  order.updateStatus(ORDER_STATUS.PAYMENT_PENDING || 'PAYMENT_PENDING', 'Payment details submitted by buyer'); 
+  // Ensure PAYMENT_PENDING is in constants or just use a string for now if not present. 
+  // Checking constants file later might be good, but 'PLACED' is default. 
+  // Let's assume we keep it as PLACED or move to a "VERIFICATION_PENDING" state if we had one.
+  // For now, let's just save the details. The status might remain PLACED until verified.
+  
+  await order.save();
+  
+  res.json({
+    success: true,
+    message: 'Payment details submitted. Waiting for vendor verification.',
+    order
+  });
+}));
+
+router.post('/orders/:id/refund', protect, [
+  validators.mongoId('id'),
+  body('reason').trim().isLength({ min: 10, max: 1000 }).withMessage('Reason must be 10-1000 characters'),
+  validate
+], asyncHandler(async (req, res) => {
+  const { reason } = req.body;
   
   const order = await Order.findOne({
     _id: req.params.id,
@@ -478,6 +516,15 @@ router.post('/orders/:id/refund', protect, [
     });
   }
   
+  // Only allow refund request for delivered or confirmed (paid) orders
+  const allowedStatuses = [ORDER_STATUS.DELIVERED, ORDER_STATUS.CONFIRMED];
+  if (!allowedStatuses.includes(order.status)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Refunds can only be requested for delivered or confirmed orders'
+    });
+  }
+  
   // Check if refund already exists
   const existingRefund = await RefundRequest.findOne({ orderId: order._id });
   if (existingRefund) {
@@ -487,14 +534,25 @@ router.post('/orders/:id/refund', protect, [
     });
   }
   
+  // Create RefundRequest
   const refund = await RefundRequest.create({
     orderId: order._id,
-    paymentId: order.paymentId,
     buyerId: req.user._id,
     vendorId: order.vendorId,
     reason,
-    requestedAmount: Math.min(requestedAmount, order.totalAmount)
+    requestedAmount: order.totalAmount, // Auto-set to order total
+    status: 'pending'
   });
+  
+  // Update order with refund request
+  order.refundRequested = true;
+  order.refundReason = reason;
+  order.refundStatus = 'PENDING';
+  
+  // Optionally update status to indicate refund requested in timeline
+  order.updateStatus('REFUND_REQUESTED', reason);
+  
+  await order.save();
   
   res.status(201).json({
     success: true,
@@ -561,7 +619,7 @@ router.post('/orders/:id/feedback', protect, [
 // @route   PATCH /api/orders/:id/cancel
 // @desc    Cancel order (buyer only, before shipped)
 // @access  Buyer
-router.patch('/:id/cancel', [
+router.patch('/orders/:id/cancel', [
   validators.mongoId('id'),
   body('reason').optional().isString().trim(),
   validate
@@ -596,47 +654,6 @@ router.patch('/:id/cancel', [
   res.json({
     success: true,
     message: 'Order cancelled successfully',
-    order
-  });
-}));
-
-// @route   POST /api/orders/:id/refund
-// @desc    Request refund for delivered order
-// @access  Buyer
-router.post('/:id/refund', [
-  validators.mongoId('id'),
-  body('reason').notEmpty().isString().trim().withMessage('Refund reason is required'),
-  validate
-], protect, asyncHandler(async (req, res) => {
-  const { reason } = req.body;
-  
-  const order = await Order.findOne({
-    _id: req.params.id,
-    buyerId: req.user._id
-  });
-  
-  if (!order) {
-    return res.status(404).json({
-      success: false,
-      message: 'Order not found'
-    });
-  }
-  
-  // Only allow refund request for delivered orders
-  if (order.status !== ORDER_STATUS.DELIVERED) {
-    return res.status(400).json({
-      success: false,
-      message: 'Refunds can only be requested for delivered orders'
-    });
-  }
-  
-  // Update order status to returned with reason
-  order.updateStatus(ORDER_STATUS.RETURNED, reason);
-  await order.save();
-  
-  res.json({
-    success: true,
-    message: 'Refund request submitted successfully. Vendor will review your request.',
     order
   });
 }));

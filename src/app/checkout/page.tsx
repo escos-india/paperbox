@@ -84,13 +84,17 @@ function CheckoutContent() {
         setIsProcessing(true)
         try {
             // 1. Create Order (Pay on Delivery)
-            await ordersAPI.checkout({
+            const res = await ordersAPI.checkout({
                 items: [{ productId: product._id, quantity: 1 }],
                 shippingAddress
             })
 
             // 2. Success - No immediate payment
-            setIsSuccess(true)
+            // Capture the first order ID (assuming single vendor order for now or handle list?)
+            // The API returns { orders: [...] }
+            const orderId = res.data.orders[0]._id || res.data.orders[0].id;
+
+            setIsSuccess(orderId) // Store ID instead of boolean
             toast.success("Order placed successfully!")
         } catch (error) {
             console.error(error)
@@ -106,13 +110,12 @@ function CheckoutContent() {
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                     <CheckCircle2 className="h-10 w-10 text-green-600" />
                 </div>
-                <h1 className="text-3xl font-bold mb-4">Order Confirmed!</h1>
+                <h1 className="text-3xl font-bold mb-4">Order Placed!</h1>
                 <p className="text-muted-foreground mb-8">
-                    Thank you for your purchase. A confirmation has been sent to your email.
+                    Please complete the payment to confirm your order.
                 </p>
                 <div className="flex gap-4 justify-center">
-                    <Button onClick={() => router.push("/catalog")}>Continue Shopping</Button>
-                    <Button variant="outline" onClick={() => router.push("/paperbox/buyer/orders")}>View Orders</Button>
+                    <Button onClick={() => router.push(`/paperbox/buyer/orders/${isSuccess}`)}>Complete Payment</Button>
                 </div>
             </div>
         )

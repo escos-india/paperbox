@@ -547,30 +547,134 @@ router.post('/subscription/verify', [
   });
 }));
 
-// ==================== RAZORPAY KEYS ====================
-
-// @route   PUT /api/vendor/razorpay-keys
-// @desc    Update Razorpay API keys
+// @route   POST /api/vendor/orders/:id/verify-payment
+// @desc    Verify manual payment
 // @access  Vendor
-router.put('/razorpay-keys', [
-  body('razorpayKeyId').trim().notEmpty(),
-  body('razorpayKeySecret').trim().notEmpty(),
+router.post('/orders/:id/verify-payment', [
+  validators.mongoId('id'),
   validate
 ], asyncHandler(async (req, res) => {
-  const { razorpayKeyId, razorpayKeySecret } = req.body;
-  
-  // Encrypt and store
-  const encryptedKeyId = paymentService.encryptKey(razorpayKeyId);
-  const encryptedKeySecret = paymentService.encryptKey(razorpayKeySecret);
-  
-  await User.findByIdAndUpdate(req.user._id, {
-    razorpayKeyId: encryptedKeyId,
-    razorpayKeySecret: encryptedKeySecret
+  const order = await Order.findOne({
+    _id: req.params.id,
+    vendorId: req.user._id
   });
+  
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+  
+  // Update order status
+  order.isPaymentVerified = true;
+  order.updateStatus(ORDER_STATUS.CONFIRMED, 'Payment verified by vendor');
+  await order.save();
+
+  // Update payment record
+  await Payment.findOneAndUpdate(
+    { orderId: order._id },
+    { status: 'SUCCESS', paidToVendor: true }
+  );
   
   res.json({
     success: true,
-    message: 'Razorpay credentials updated'
+    message: 'Payment verified and order confirmed',
+    order
+  });
+}));
+
+// @route   POST /api/vendor/orders/:id/refund-decision
+// @desc    Approve or reject refund
+// @access  Vendor
+router.post('/orders/:id/refund-decision', [
+  validators.mongoId('id'),
+  body('status').isIn(['APPROVED', 'REJECTED']),
+  body('note').optional().isString(),
+  validate
+], asyncHandler(async (req, res) => {
+  const { status, note } = req.body;
+  
+  const order = await Order.findOne({
+    _id: req.params.id,
+    vendorId: req.user._id
+  });
+  
+  if (!order) {
+    return res.status(404).json({
+      success: false,
+      message: 'Order not found'
+    });
+  }
+
+  if (!order.refundRequested) {
+     return res.status(400).json({
+      success: false,
+      message: 'No refund requested for this order'
+    });
+  }
+  
+  order.refundStatus = status;
+  
+  if (status === 'APPROVED') {
+    order.updateStatus(ORDER_STATUS.RETURNED, `Refund Approved: ${note || ''}`);
+    // Logic to initiate actual money refund would go here if automated, 
+    // but for manual, vendor handles it externally.
+  } else {
+    // Rejected, maybe revert status or keep as delivered but refund rejected?
+    // If it was "Return Requested", we might want to close that state.
+    // For now just update the log.
+    order.timeline.push({
+      status: 'REFUND_REJECTED',
+      timestamp: new Date(),
+      note: note || 'Refund request rejected'
+    });
+  }
+  
+  await order.save();
+  
+  res.json({
+    success: true,
+    message: `Refund request ${status.toLowerCase()}`,
+    order
+  });
+}));
+
+// @route   PUT /api/vendor/profile/qr-code
+// @desc    Upload QR Code for manual payments
+// @access  Vendor
+router.put('/profile/qr-code', upload.single('qrCode'), [
+  validate
+], asyncHandler(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      message: 'Please upload an image'
+    });
+  }
+
+  // Upload to Cloudinary
+  const result = await cloudinaryService.uploadImage(
+    req.file,
+    `paperbox/users/${req.user._id}/qr-code`
+  );
+
+  if (!result.success) {
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to upload image'
+    });
+  }
+
+  // Update user profile
+  await User.findByIdAndUpdate(req.user._id, {
+    qrCode: result.url
+  });
+
+  res.json({
+    success: true,
+    message: 'QR Code updated successfully',
+    qrCode: result.url
   });
 }));
 

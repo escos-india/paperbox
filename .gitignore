@@ -45,3 +45,13 @@ next-env.d.ts
 
 # logs
 build_log.txt
+
+# IDEs
+.vscode/
+.idea/
+
+# General Logs
+*.log
+
+# System
+thumbs.db

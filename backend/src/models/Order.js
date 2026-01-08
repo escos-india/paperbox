@@ -100,6 +100,18 @@ const orderSchema = new mongoose.Schema({
     required: [true, 'Shipping address is required']
   },
   
+  // Payment details (Manual QR)
+  paymentProof: {
+    type: String, // URL to screenshot or just text
+  },
+  transactionId: {
+    type: String
+  },
+  isPaymentVerified: {
+    type: Boolean,
+    default: false
+  },
+
   // Delivery OTP for verification
   deliveryOtp: {
     type: String,
@@ -108,6 +120,18 @@ const orderSchema = new mongoose.Schema({
   deliveryOtpVerified: {
     type: Boolean,
     default: false
+  },
+
+  // Refund
+  refundRequested: {
+    type: Boolean,
+    default: false
+  },
+  refundReason: String,
+  refundStatus: {
+    type: String,
+    enum: ['NONE', 'PENDING', 'APPROVED', 'REJECTED'],
+    default: 'NONE'
   },
   
   // Timeline tracking

@@ -101,9 +101,9 @@ function OrderDetailsContent() {
         )
     }
 
-    const canPay = order.status === 'delivered' && order.paymentId?.status === 'pending'
-    const canCancel = ['placed', 'accepted', 'picked_packed'].includes(order.status)
-    const canRefund = order.status === 'delivered' && order.paymentId?.status !== 'pending'
+    const canPay = !order.isPaymentVerified
+    const canCancel = ['placed', 'accepted', 'picked_packed', 'payment_pending'].includes(order.status)
+    const canRefund = (order.status === 'delivered' || order.status === 'confirmed') && order.isPaymentVerified && !order.refundRequested
 
     return (
         <div className="max-w-4xl mx-auto py-8">
@@ -198,20 +198,84 @@ function OrderDetailsContent() {
                     </Card>
 
                     {/* Pending Payment Card (Mock) */}
-                    {canPay && (
-                        <Card className="border-green-200 bg-green-50">
+                    {/* Payment Section */}
+                    {(!order.isPaymentVerified && !order.transactionId) && (
+                        <Card className="border-blue-200 bg-blue-50">
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-green-700">
-                                    <CreditCard className="h-5 w-5" /> Payment Pending
+                                <CardTitle className="flex items-center gap-2 text-blue-700">
+                                    <CreditCard className="h-5 w-5" /> Pending Payment
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <p className="text-blue-800">
+                                    Please scan the QR code to pay using UPI/Wallet and enter the transaction ID below.
+                                </p>
+
+                                {order.vendorId?.qrCode ? (
+                                    <div className="flex justify-center bg-white p-4 rounded-lg w-fit mx-auto border">
+                                        <Image
+                                            src={order.vendorId.qrCode}
+                                            alt="Vendor QR Code"
+                                            width={200}
+                                            height={200}
+                                            className="object-contain"
+                                        />
+                                    </div>
+                                ) : (
+                                    <div className="text-center p-4 bg-gray-100 rounded text-muted-foreground">
+                                        Vendor has not provided a QR Code. <br /> Please contact vendor: {order.vendorId?.phone}
+                                    </div>
+                                )}
+
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium">Transaction ID / UTR</label>
+                                    <input
+                                        type="text"
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        placeholder="Enter payment reference number"
+                                        id="transactionIdInput"
+                                    />
+                                </div>
+
+                                <Button
+                                    className="w-full bg-blue-600 hover:bg-blue-700"
+                                    onClick={async () => {
+                                        const input = document.getElementById('transactionIdInput') as HTMLInputElement;
+                                        const tid = input?.value;
+                                        if (!tid) {
+                                            toast.error("Please enter transaction ID");
+                                            return;
+                                        }
+
+                                        try {
+                                            await ordersAPI.confirmPayment(order.id || order._id, { transactionId: tid });
+                                            toast.success("Payment details submitted!");
+                                            window.location.reload();
+                                        } catch (e) {
+                                            toast.error("Failed to submit payment details");
+                                        }
+                                    }}
+                                >
+                                    Confirm Payment
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {(!order.isPaymentVerified && order.transactionId) && (
+                        <Card className="border-amber-200 bg-amber-50">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-amber-700">
+                                    <Loader2 className="h-5 w-5 animate-spin" /> Payment Verification Pending
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="text-green-800 mb-4">
-                                    Your order has been delivered! Please complete the payment now.
+                                <p className="text-amber-800">
+                                    You have submitted transaction ID: <strong>{order.transactionId}</strong>
                                 </p>
-                                <Button className="w-full bg-green-600 hover:bg-green-700">
-                                    Pay Now (Mock)
-                                </Button>
+                                <p className="text-sm text-amber-700 mt-2">
+                                    Vendor needs to verify this payment before the order is processed.
+                                </p>
                             </CardContent>
                         </Card>
                     )}
@@ -237,10 +301,13 @@ function OrderDetailsContent() {
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2 mb-2">
-                                <ShieldCheck className={`h-4 w-4 ${order.paymentId?.status === 'success' ? 'text-green-600' : 'text-amber-600'}`} />
-                                <span className="font-medium capitalize">{order.paymentId?.status || "Pending"}</span>
+                                <ShieldCheck className={`h-4 w-4 ${order.isPaymentVerified ? 'text-green-600' : 'text-amber-600'}`} />
+                                <span className="font-medium capitalize">
+                                    {order.isPaymentVerified ? "Paid" : (order.transactionId ? "Verification Pending" : "Payment Pending")}
+                                </span>
                             </div>
-                            <p className="text-sm text-muted-foreground">Method: Pay on Delivery</p>
+                            <p className="text-sm text-muted-foreground">Method: Manual QR / UTR</p>
+                            {order.transactionId && <p className="text-xs text-muted-foreground mt-1">Ref: {order.transactionId}</p>}
                         </CardContent>
                         {canRefund && (
                             <CardFooter className="pt-4">

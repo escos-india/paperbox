@@ -14,6 +14,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Edit } from "lucide-react"
+import { vendorAPI } from "@/lib/api"
 
 interface EditProfileDialogProps {
     user: any
@@ -50,6 +51,14 @@ export function EditProfileDialog({ user, onUpdate }: EditProfileDialogProps) {
         setError("")
 
         try {
+            // Handle QR Code Upload (Vendor only)
+            const qrInput = document.getElementById('qrCode') as HTMLInputElement;
+            if (isVendor && qrInput?.files?.length) {
+                const formData = new FormData();
+                formData.append('qrCode', qrInput.files[0]);
+                await vendorAPI.uploadQRCode(formData);
+            }
+
             const payload = {
                 name: formData.name,
                 email: formData.email,
@@ -164,6 +173,19 @@ export function EditProfileDialog({ user, onUpdate }: EditProfileDialogProps) {
                                     />
                                 </div>
                             </>
+                        )}
+
+                        {isVendor && (
+                            <div className="grid gap-2 border-t pt-4">
+                                <Label htmlFor="qrCode">Payment QR Code (Image)</Label>
+                                <Input
+                                    id="qrCode"
+                                    name="qrCode"
+                                    type="file"
+                                    accept="image/*"
+                                />
+                                <p className="text-xs text-muted-foreground">Upload your UPI/Payment QR code for manual payments.</p>
+                            </div>
                         )}
 
                         <div className="border-t pt-4 mt-2">

@@ -37,13 +37,17 @@ const CONDITIONS = {
 // Order Statuses
 const ORDER_STATUS = {
   PLACED: 'placed',
+  CONFIRMED: 'confirmed',
   ACCEPTED: 'accepted',
   PICKED_PACKED: 'picked_packed',
   SHIPPED: 'shipped',
   OUT_FOR_DELIVERY: 'out_for_delivery',
   DELIVERED: 'delivered',
   CANCELLED: 'cancelled',
-  RETURNED: 'returned'
+  RETURNED: 'returned',
+  REFUND_REQUESTED: 'REFUND_REQUESTED',
+  PAYMENT_PENDING: 'payment_pending',
+  PAYMENT_PENDING_LEGACY: 'PAYMENT_PENDING'
 };
 
 // Payment Statuses

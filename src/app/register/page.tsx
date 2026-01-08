@@ -23,14 +23,13 @@ export default function RegisterPage() {
     // Form State
     const [verifiedEmail, setVerifiedEmail] = useState("")
     const [otp, setOtp] = useState("")
+    const [qrFile, setQrFile] = useState<File | null>(null)
     const [formData, setFormData] = useState({
         name: "",
-        phone: "", // Phone is now collected in step 2
+        phone: "",
         password: "",
         businessName: "",
         gstNumber: "",
-        razorpayKeyId: "",
-        razorpayKeySecret: "",
         street: "",
         city: "",
         state: "",
@@ -86,27 +85,29 @@ export default function RegisterPage() {
 
         setIsLoading(true)
         try {
-            const payload = {
-                otpIdentifier: verifiedEmail,
-                otp,
-                name: formData.name,
-                email: verifiedEmail,
-                phone: formData.phone,
-                password: formData.password,
-                businessName: formData.businessName,
-                gstNumber: formData.gstNumber,
-                razorpayKeyId: formData.razorpayKeyId,
-                razorpayKeySecret: formData.razorpayKeySecret,
-                address: {
-                    street: formData.street,
-                    city: formData.city,
-                    state: formData.state,
-                    pincode: formData.pincode,
-                    country: formData.country
-                }
+            const submitData = new FormData();
+            submitData.append('otpIdentifier', verifiedEmail);
+            submitData.append('otp', otp);
+            submitData.append('name', formData.name);
+            submitData.append('email', verifiedEmail);
+            submitData.append('phone', formData.phone);
+            submitData.append('password', formData.password);
+            submitData.append('businessName', formData.businessName);
+            if (formData.gstNumber) submitData.append('gstNumber', formData.gstNumber);
+
+            submitData.append('address', JSON.stringify({
+                street: formData.street,
+                city: formData.city,
+                state: formData.state,
+                pincode: formData.pincode,
+                country: formData.country
+            }));
+
+            if (qrFile) {
+                submitData.append('qrCode', qrFile);
             }
 
-            await authAPI.vendorSignup(payload)
+            await authAPI.vendorSignup(submitData)
 
             toast.success("Registration successful! Waiting for Admin Approval.")
             setTimeout(() => router.push("/login"), 2000)
@@ -214,15 +215,24 @@ export default function RegisterPage() {
                             </div>
 
                             <div className="border-t pt-4 mt-4">
-                                <h4 className="text-sm font-semibold mb-4">Payment Configuration (Razorpay)</h4>
+                                <h4 className="text-sm font-semibold mb-4">Payment Configuration</h4>
                                 <div className="grid grid-cols-1 gap-4">
                                     <div className="space-y-2">
-                                        <label className="text-sm font-medium">Key ID</label>
-                                        <input name="razorpayKeyId" required value={formData.razorpayKeyId} onChange={handleChange} className="w-full p-2 border rounded-md" placeholder="rzp_live_..." />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-medium">Key Secret</label>
-                                        <input name="razorpayKeySecret" required type="password" value={formData.razorpayKeySecret} onChange={handleChange} className="w-full p-2 border rounded-md" />
+                                        <label className="text-sm font-medium">Payment QR Code (UPI/Wallet)</label>
+                                        <div className="flex flex-col gap-2">
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                                                onChange={(e) => {
+                                                    const file = e.target.files?.[0];
+                                                    if (file) {
+                                                        setQrFile(file);
+                                                    }
+                                                }}
+                                            />
+                                            <p className="text-xs text-muted-foreground">Upload your UPI QR code image to receive manual payments.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

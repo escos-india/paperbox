@@ -67,13 +67,9 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
-  razorpayKeyId: {
+  qrCode: {
     type: String,
-    select: false // Encrypted, don't expose
-  },
-  razorpayKeySecret: {
-    type: String,
-    select: false // Encrypted, don't expose
+    default: '' // URL to the QR code image
   },
   totalEarnings: {
     type: Number,
@@ -132,8 +128,6 @@ userSchema.methods.toJSON = function() {
   const obj = this.toObject();
   delete obj.password;
   delete obj.secretKey;
-  delete obj.razorpayKeyId;
-  delete obj.razorpayKeySecret;
   delete obj.__v;
   return obj;
 };

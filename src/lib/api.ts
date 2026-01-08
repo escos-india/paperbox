@@ -47,17 +47,9 @@ export const authAPI = {
     sendOTP: (identifier: string) => api.post('/auth/send-otp', { identifier }),
     verifyOTP: (identifier: string, otp: string, name?: string) => api.post('/auth/verify-otp', { identifier, otp, name }),
 
-    vendorSignup: (data: {
-        phone: string;
-        otp: string;
-        name: string;
-        email?: string;
-        password?: string;
-        businessName: string;
-        gstNumber?: string;
-        razorpayKeyId?: string;
-        razorpayKeySecret?: string;
-    }) => api.post('/auth/vendor/signup', data),
+    vendorSignup: (data: FormData) => api.post('/auth/vendor/signup', data, {
+        headers: { 'Content-Type': undefined } // Let browser set boundary
+    }),
 
     vendorLogin: (email: string, password: string) =>
         api.post('/auth/vendor/login', { email, password }),
@@ -145,6 +137,9 @@ export const ordersAPI = {
 
     cancelOrder: (orderId: string, reason?: string) =>
         api.patch(`/orders/${orderId}/cancel`, { reason }),
+
+    confirmPayment: (orderId: string, data: { transactionId: string; paymentProof?: string }) =>
+        api.post(`/orders/${orderId}/confirm-payment`, data),
 };
 
 // ==================== VENDOR API ====================
@@ -207,9 +202,19 @@ export const vendorAPI = {
         planId: string;
     }) => api.post('/vendor/subscription/verify', data),
 
-    // Razorpay Keys
-    updateRazorpayKeys: (razorpayKeyId: string, razorpayKeySecret: string) =>
-        api.put('/vendor/razorpay-keys', { razorpayKeyId, razorpayKeySecret }),
+    // Razorpay Keys (Legacy/QR Code)
+    updateProfile: (data: any) => api.put('/auth/profile', data), // Reusing auth profile update
+
+    verifyPayment: (orderId: string) =>
+        api.post(`/vendor/orders/${orderId}/verify-payment`),
+
+    refundDecision: (orderId: string, data: { status: 'APPROVED' | 'REJECTED'; note?: string }) =>
+        api.post(`/vendor/orders/${orderId}/refund-decision`, data),
+
+    uploadQRCode: (formData: FormData) =>
+        api.put('/vendor/profile/qr-code', formData, {
+            headers: { 'Content-Type': undefined }
+        }),
 };
 
 // ==================== ADMIN API ====================
