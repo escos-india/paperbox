@@ -111,7 +111,7 @@ export default function ServicesPage() {
                         Partner with PAPERBOX for a vendor-neutral, execution-focused approach to enterprise IT.
                     </p>
                     <a href="https://wa.me/917058433905" target="_blank" rel="noopener noreferrer">
-                        <Button size="lg" variant="secondary">
+                        <Button size="lg" className="h-12 px-8 text-base">
                             Schedule a Consultation
                         </Button>
                     </a>

@@ -15,7 +15,7 @@ export function CTA() {
                     </p>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                         <Link href="/contact" className="w-full sm:w-auto">
-                            <Button size="lg" className="h-12 px-8 text-base w-full">
+                            <Button variant="outline" size="lg" className="h-12 px-8 text-base w-full">
                                 Get IT Managed
                             </Button>
                         </Link>
