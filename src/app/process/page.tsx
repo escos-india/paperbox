@@ -42,19 +42,40 @@ const steps = [
 export default function ProcessPage() {
     return (
         <div className="min-h-screen bg-background">
-            <Section className="bg-secondary/20 py-20">
-                <div className="container mx-auto max-w-7xl text-center">
-                    <h1 className="text-4xl font-bold mb-4">Our Process</h1>
-                    <p className="text-xl text-muted-foreground mb-8">
+            {/* Hero Section */}
+            <Section
+                container={false}
+                className="relative overflow-hidden mt-15 bg-gradient-to-b from-secondary/30 via-secondary/10 to-background !py-10 !px-6 md:!px-12"
+            >
+                {/* Subtle Glow */}
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+                </div>
+
+                <div className="relative max-w-5xl mx-auto text-center">
+                    <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+                        Our Process
+                    </h1>
+
+                    <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto mb-6">
                         A disciplined, five-step framework for delivering enterprise IT excellence.
                     </p>
-                    <Link href="/contact">
-                        <Button size="lg">Start Your Assessment</Button>
-                    </Link>
+
+                    <div className="flex justify-center">
+                        <Link href="/contact">
+                            <Button size="lg" className="px-8">
+                                Start Your Assessment
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
             </Section>
 
-            <Section className="py-20">
+
+            <Section
+                container={false}
+                className="relative overflow-hidden bg-gradient-to-b from-secondary/30 via-secondary/10 to-background !py-10 !px-6 md:!px-12"
+            >
                 <div className="container mx-auto max-w-7xl">
                     <div className="flex flex-wrap gap-8 items-stretch justify-center relative">
                         {steps.map((step, index) => (

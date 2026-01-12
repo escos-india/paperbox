@@ -126,7 +126,7 @@ export default function RegisterPage() {
 
     return (
         <Section className="min-h-[80vh] flex items-center justify-center bg-muted/30 py-12">
-            <Card className="w-full max-w-2xl">
+            <Card className="w-full max-w-2xl mx-auto">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl">Vendor Registration</CardTitle>
                     <CardDescription>Join Paperbox to sell your products</CardDescription>

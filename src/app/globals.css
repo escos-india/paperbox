@@ -119,8 +119,8 @@
     @apply text-base md:text-lg leading-relaxed;
   }
 
-  /* Container Override for consistent padding */
+  /* Container Override - full width without side padding */
   .container {
-    @apply px-4 md:px-6 lg:px-8 mx-auto max-w-7xl;
+    @apply px-0 mx-auto max-w-full;
   }
 }

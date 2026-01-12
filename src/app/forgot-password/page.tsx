@@ -76,7 +76,7 @@ export default function VendorForgotPasswordPage() {
 
     return (
         <Section className="min-h-[80vh] flex items-center justify-center bg-muted/30">
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md mx-auto">
                 <CardHeader>
                     <div className="mb-2">
                         <Link

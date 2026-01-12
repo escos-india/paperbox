@@ -69,7 +69,7 @@ export default function LoginPage() {
 
     return (
         <Section className="min-h-[80vh] flex items-center justify-center bg-muted/30">
-            <Card className="w-full max-w-md">
+            <Card className="w-full max-w-md mx-auto">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl">
                         {step === 'IDENTIFIER' ? 'Welcome Back' : 'Verify Email'}

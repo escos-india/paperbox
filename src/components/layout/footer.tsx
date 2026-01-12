@@ -28,8 +28,8 @@ const footerLinks = {
 export function Footer() {
     const pathname = usePathname()
 
-    // Hide Footer on Admin Routes
-    if (pathname?.startsWith("/paperbox/admin")) {
+    // Hide Footer only on deep admin dashboard routes (not the login page)
+    if (pathname?.startsWith("/paperbox/admin/dashboard")) {
         return null
     }
 

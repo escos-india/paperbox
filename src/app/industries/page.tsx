@@ -47,7 +47,10 @@ const industries = [
 export default function IndustriesPage() {
     return (
         <div className="min-h-screen bg-background">
-            <Section className="bg-secondary/20 py-20">
+            <Section
+                container={false}
+                className="relative overflow-hidden mt-15 bg-gradient-to-b from-secondary/30 via-secondary/10 to-background !py-10 !px-6 md:!px-12"
+            >
                 <div className="container mx-auto max-w-4xl text-center">
                     <h1 className="text-4xl font-bold mb-4">Industries We Serve</h1>
                     <p className="text-xl text-muted-foreground mb-8">
@@ -59,7 +62,7 @@ export default function IndustriesPage() {
                 </div>
             </Section>
 
-            <Section className="py-20">
+            <Section className="py-5">
                 <div className="container mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {industries.map((ind, index) => (

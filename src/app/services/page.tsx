@@ -49,11 +49,14 @@ export default function ServicesPage() {
     return (
         <div className="min-h-screen bg-background">
             {/* Hero Section */}
-            <Section className="bg-secondary/20 py-20">
+            <Section container={false} className="bg-secondary/20 py-8 mt-15 md:py-10">
                 <div className="container mx-auto text-center max-w-4xl">
-                    <h1 className="text-4xl md:text-5xl font-bold mb-6">Enterprise IT Execution</h1>
-                    <p className="text-xl text-muted-foreground mb-8">
-                        We don't just consult; we build, deploy, and manage. PAPERBOX delivers end-to-end IT infrastructure solutions with a focus on reliability, security, and scalability.
+                    <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                        Enterprise IT Execution
+                    </h1>
+                    <p className="text-xl text-muted-foreground mb-4">
+                        We don't just consult; we build, deploy, and manage. PAPERBOX delivers end-to-end IT infrastructure
+                        solutions with a focus on reliability, security, and scalability.
                     </p>
                     <div className="flex justify-center gap-4">
                         <a href="tel:+917058433905">
@@ -66,8 +69,11 @@ export default function ServicesPage() {
                 </div>
             </Section>
 
+
+
+
             {/* Services Grid */}
-            <Section className="py-20">
+            <Section className="">
                 <div className="container mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                         {services.map((service, index) => (
@@ -98,7 +104,7 @@ export default function ServicesPage() {
             </Section>
 
             {/* CTA Section */}
-            <Section className="bg-primary text-primary-foreground py-20">
+            <Section className="bg-primary text-primary-foreground">
                 <div className="container mx-auto text-center max-w-3xl">
                     <h2 className="text-3xl font-bold mb-6">Ready to Optimize Your Infrastructure?</h2>
                     <p className="text-lg mb-8 opacity-90">

@@ -51,12 +51,8 @@ export function Header() {
         return () => window.removeEventListener("scroll", handleScroll)
     }, [])
 
-    // Hide Header on Admin/Dashboard Routes if needed (optional, keeping it consistent)
-    // But usually dashboards have their own layout. 
-    // For now, let's keep it visible or handle specific admin layout logic elsewhere.
-    // Hide Header on Admin/Dashboard Routes if needed (optional, keeping it consistent)
-    // Also hide on Auth pages (Login/Register)
-    if (pathname === "/login" || pathname === "/register" || (pathname?.startsWith("/paperbox/admin") && !pathname?.startsWith("/paperbox/admin/products"))) {
+    // Hide Header only on deep admin dashboard routes (not the login page)
+    if (pathname?.startsWith("/paperbox/admin/dashboard")) {
         return null
     }
 
@@ -105,8 +101,8 @@ export function Header() {
                             </Button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-2">
-                            <Button asChild variant="ghost">
+                        <div className="flex items-center gap-4">
+                            <Button asChild>
                                 <Link href="/login">Login</Link>
                             </Button>
                             <Button asChild>
